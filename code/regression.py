@@ -1,3 +1,4 @@
+from locale import D_FMT
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 from catboost import CatBoostRegressor
@@ -5,6 +6,11 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 import numpy as np
 import mlflow
+from sklearn.linear_model import LinearRegression
+
+from sklearn.compose import make_column_transformer, make_column_selector
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 
 def determine_bowl_team(row):
@@ -68,9 +74,13 @@ if __name__ == "__main__":
             "current_wickets",
             "overall_ball_n",
             "batting_team",
-            "batter_won_toss",
+            # "batter_won_toss",
         ]
         target = ["first_innings_total_runs"]
+
+        id_column = ["match_id"]
+
+        all_req = features + target + id_column
 
         config = {
             "test_size": 0.2,
@@ -80,13 +90,24 @@ if __name__ == "__main__":
             "early_stopping_rounds": 50,
             "l2_leaf_reg": 2,
             "max_depth": 3,
+            "model_name": "linear_regression",
         }
 
         mlflow.log_param("features", features)
 
         mlflow.log_params(config)
 
-        # train test split
+        # preprocess data
+
+        cat_linear_processor = OneHotEncoder(handle_unknown="ignore")
+        cat_selector = make_column_selector(pattern="batting_team")
+        linear_preprocessor = make_column_transformer(
+            (cat_linear_processor, cat_selector),
+            remainder="passthrough",
+            sparse_threshold=0.0,
+        )
+
+        linear_preprocessor.fit(df[features])
 
         splitter = GroupShuffleSplit(
             test_size=config["test_size"], n_splits=2, random_state=7
@@ -100,40 +121,32 @@ if __name__ == "__main__":
         y_train = train[target]
         y_test = test[target]
 
-        clf = CatBoostRegressor(
-            learning_rate=config["learning_rate"],
-            iterations=config["iterations"],
-            eval_metric=config["eval_metric"],
-            l2_leaf_reg=config["l2_leaf_reg"],
-            max_depth=config["max_depth"],
-        )
+        X_train_pre = linear_preprocessor.transform(X_train)
+        X_test_pre = linear_preprocessor.transform(X_test)
 
-        cat_feature_ind = [3, 4]
-        clf.fit(
-            X_train,
-            y_train,
-            eval_set=(X_test, y_test),
-            early_stopping_rounds=config["early_stopping_rounds"],
-            cat_features=cat_feature_ind,
-        )
+        reg = LinearRegression()
+        print("starting fit ")
+        reg.fit(X_train_pre, y_train)
+        print("fit done")
+        rsqur = reg.score(X_test_pre, y_test)
+        mlflow.log_metric("rsquared", rsqur)
+        print("score done")
+        preds = reg.predict(X_test_pre)
+        print("preds done")
+        # flat_y_test = y_test.values.flatten()
 
-        mlflow.log_param("cat_feature_indices", cat_feature_ind)
-
-        preds = clf.predict(X_test)
-
-        flat_y_test = y_test.values.flatten()
-
-        residuals = preds - flat_y_test
+        residuals = preds - y_test.values
 
         plots_path = "/Users/TimothyW/Fun/cricket_prediction/plots/"
-
+        print("starting residuals plot")
         resid_fig = plot_residuals(residuals)
         resid_fig.savefig(f"{plots_path}/residuals_hist.png")
         mlflow.log_artifact(f"{plots_path}/residuals_hist.png")
+        print("residuals plot done")
 
         X_test["preds"] = preds
         X_test["actual"] = y_test
-        X_test["residuals"] = preds - flat_y_test
+        X_test["residuals"] = preds - y_test
 
         rmse = np.sqrt(mean_squared_error(y_test, preds))
         mlflow.log_metric("RMSE", rmse)
