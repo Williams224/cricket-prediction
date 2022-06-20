@@ -48,6 +48,10 @@ if __name__ == "__main__":
     df = df[
         ~((df.total_balls_bowled < 300) & (df.total_wickets_lost < 10))
     ]  # remove rain delays
+    df["batting_team_balls_faced"] = df.groupby("batting_team")["batter"].transform(
+        "count"
+    )
+    df = df[df.batting_team_balls_faced > 4000]
 
     df["batter_won_toss"] = df["batting_team"] == df["toss_winner"]
 
