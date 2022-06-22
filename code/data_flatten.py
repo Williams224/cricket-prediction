@@ -63,8 +63,20 @@ def process_innings(jsn):
     innings_df["total_balls_bowled"] = len(innings_df)
     innings_df["innings_balls_left"] = len(innings_df) - innings_df["overall_ball_n"]
     innings_df["total_wickets_lost"] = innings_df["wicket_taken"].sum()
+    innings_df["batter_current_runs"] = (
+        innings_df.sort_values("overall_ball_fraction")
+        .reset_index(drop=True)
+        .groupby("batter")["total_delivery_runs"]
+        .cumsum(axis=0)
+    )
 
     return innings_df
+
+
+def determine_bowl_team(row):
+    if row["batting_team"] == row["team_one"]:
+        return row["team_two"]
+    return row["team_one"]
 
 
 def process_match(jsn):
@@ -78,6 +90,27 @@ def process_match(jsn):
     first_innings_df["toss_winner"] = jsn["info"]["toss"]["winner"]
     first_innings_df["team_one"] = jsn["info"]["teams"][0]
     first_innings_df["team_two"] = jsn["info"]["teams"][1]
+
+    first_innings_df["batter_won_toss"] = (
+        first_innings_df["batting_team"] == first_innings_df["toss_winner"]
+    )
+
+    first_innings_df["bowling_team"] = first_innings_df.apply(
+        determine_bowl_team, axis=1
+    )
+
+    first_innings_df["year"] = first_innings_df["date"].str[0:4]
+
+    first_innings_df["runs_per_ball"] = (
+        first_innings_df["current_runs"] / first_innings_df["overall_ball_n"]
+    )
+
+    first_innings_df["match_id"] = (
+        first_innings_df["city"]
+        + first_innings_df["batting_team"]
+        + first_innings_df["bowling_team"]
+        + first_innings_df["date"]
+    )
     i = 0
     for team, players in jsn["info"]["players"].items():
         if i == 0:
@@ -108,6 +141,10 @@ if __name__ == "__main__":
     df_all = pd.concat(dfs)
 
     df_all.info(verbose=True)
+
+    df_all["batting_team_balls_faced"] = df_all.groupby("batting_team")[
+        "batter"
+    ].transform("count")
 
     df_all.to_parquet(
         "/Users/TimothyW/Fun/cricket_prediction/data/processed_first_innings/first_innings_processed.parquet"
