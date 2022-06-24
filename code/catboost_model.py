@@ -29,6 +29,10 @@ class CatboostModel(BaseModel):
             **fit_params
         )
 
+    def predict(self, test_data):
+        X_test = test_data[self.all_features]
+        return self.model.predict(X_test)
+
 
 Feature = namedtuple("feature", "name categorical")
 
@@ -45,7 +49,7 @@ catboost_model = CatboostModel(
     "catboost_model",
     features,
     {
-        "learning_rate": 0.03,
+        "learning_rate": 0.1,
         "iterations": 3000,
         "eval_metric": "RMSE",
         "l2_leaf_reg": 2,
