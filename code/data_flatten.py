@@ -132,7 +132,7 @@ def process_file(f_name):
 
 if __name__ == "__main__":
 
-    data_path = "/Users/TimothyW/Fun/cricket_prediction/data/odis_male_json/"
+    
     dfs = []
     for f_name in os.listdir(data_path):
         f_name_full = f"{data_path}/{f_name}"
