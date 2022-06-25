@@ -46,7 +46,7 @@ features = [
 ]
 
 catboost_model = CatboostModel(
-    "catboost_model",
+    "catboost",
     features,
     {
         "learning_rate": 0.1,

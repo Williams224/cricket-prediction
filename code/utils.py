@@ -12,9 +12,11 @@ def determine_bowl_team(row):
     return row["team_one"]
 
 
-def rmse_at_balls(test_df, balls):
+def rmse_at_balls(test_df, balls, model_name, target_name):
     ball_df = test_df[test_df.overall_ball_n == balls]
-    return np.sqrt(mean_squared_error(ball_df["actual"], ball_df["preds"]))
+    return np.sqrt(
+        mean_squared_error(ball_df[target_name], ball_df[f"{model_name}_predictions"])
+    )
 
 
 def rmse_team(test_df, country):
@@ -92,65 +94,53 @@ def plot_scatter(predicted, actual, label, x_axis="actual", y_axis="predicted"):
     return fig
 
 
-def scatter_at_balls(df, balls, label, path, **kwargs):
+def scatter_at_balls(df, balls, label, model_name, target_name, **kwargs):
     ball_df = df[df.overall_ball_n == balls]
-    scat_fig = plot_scatter(ball_df["preds"], ball_df["actual"], label, **kwargs)
-    scat_fig_fp = f"{path}/scat_at_{balls}_balls.png"
+    scat_fig = plot_scatter(
+        ball_df[f"{model_name}_predictions"], ball_df[target_name], label, **kwargs
+    )
+    scat_fig_fp = f"/tmp/{model_name}_scat_at_{balls}_balls.png"
     scat_fig.savefig(scat_fig_fp)
     return scat_fig_fp
 
 
 def evaluate_reg(
     data,
-    model_prediction_column,
+    model_name,
     target_name,
     key_balls=[30, 90, 120, 150, 180, 240, 270],
 ):
     plots = {}
+    metrics = {}
 
-    scatter_plot = plot_scatter(
-        data[model_prediction_column], data[target_name], "all balls"
-    )
-    with NamedTemporaryFile() as tf:
-        scatter_plot.savefig(tf.name)
-        plots["scatter_plot"] = tf.name
+    preds = data[f"{model_name}_predictions"]
+    y_test = data[target_name]
 
-    return plots
+    scatter_plot = plot_scatter(preds, y_test, f"{model_name}_all balls")
+    file = f"/tmp/scatter_plot_{model_name}_all_balls.png"
+    scatter_plot.savefig(file)
+    plots[f"scatter_plot_{model_name}_all_balls"] = file
 
-    #
-    #   plots["scatter_plot"] = scatter_plot_fp
+    residuals = preds - y_test
 
-    #  residuals = preds - flat_y_test
+    resid_fig = plot_residuals(residuals)
+    resid_fp = f"/tmp/residuals_hist.png"
+    resid_fig.savefig(resid_fp)
 
-    #   resid_fig = plot_residuals(residuals)
-    #   resid_fp = f"{plots_path}/residuals_hist.png"
-    #   resid_fig.savefig(resid_fp)
+    plots["residuals"] = resid_fp
 
-    #  plots["residuals"] = resid_fp
+    rmse = np.sqrt(mean_squared_error(y_test, preds))
+    metrics["rmse"] = rmse
 
-    #  X_test["preds"] = preds
-    #  X_test["actual"] = y_test
-    #  X_test["residuals"] = preds - flat_y_test
+    for kb in key_balls:
+        rmse_kb = rmse_at_balls(data, kb, model_name, target_name)
+        metrics[f"rmse_at_{kb}"] = rmse_kb
+        plots[f"{model_name}_scatter_at_{kb}_balls"] = scatter_at_balls(
+            data, kb, f"{model_name}_scatter_at_{kb}_balls", model_name, target_name
+        )
 
-    #  rmse = np.sqrt(mean_squared_error(y_test, preds))
+    return plots, metrics
 
-    #  metrics = {"RMSE": rmse}
-
-    ##  mid_way = X_test[X_test.overall_ball_n == 150]
-
-    #  rmse_halfway = np.sqrt(mean_squared_error(mid_way["actual"], mid_way["preds"]))
-
-
-#    metrics["rmse_halfway"] = rmse_halfway
-
-
-##  for kb in key_balls:
-#      rmse_kb = rmse_at_balls(X_test, kb)
-#      metrics[f"rmse_at_{kb}"] = rmse_kb
-#
-#       plots[f"scatter_at_{kb}_balls"] = scatter_at_balls(
-#          X_test, kb, f"scatter_at_{kb}_balls", plots_path
-##      )
 
 #  rmse_x = []
 ##   rmse_y = []

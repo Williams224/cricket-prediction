@@ -1,5 +1,7 @@
+from sklearn import metrics
 from catboost_model import catboost_model
-
+import mlflow
+import utils
 import pandas as pd
 from sklearn.model_selection import GroupKFold
 
@@ -17,24 +19,31 @@ if __name__ == "__main__":
 
     prediction_dfs = []
 
-    for train_index, test_index in gkf.split(df, groups=df["match_id"]):
-        df_test = df.iloc[test_index]
-        catboost_model.fit(
-            df, train_index, test_index, target_name, {"early_stopping_rounds": 50}
+    mlflow.set_experiment("stacked")
+    with mlflow.start_run():
+
+        for train_index, test_index in gkf.split(df, groups=df["match_id"]):
+            df_test = df.iloc[test_index]
+            catboost_model.fit(
+                df, train_index, test_index, target_name, {"early_stopping_rounds": 50}
+            )
+            print("fit done")
+            catboost_predictions = catboost_model.predict(df_test)
+            df_test[f"{catboost_model.name}_predictions"] = catboost_predictions
+            prediction_dfs.append(df_test)
+            print("predictions done")
+
+        df_all_preds = pd.concat(prediction_dfs)
+
+        plots, metrics = utils.evaluate_reg(
+            df_all_preds, catboost_model.name, target_name
         )
-        print("fit done")
-        catboost_predictions = catboost_model.predict(df_test)
-        df_test["catboost_predictions"] = catboost_predictions
-        prediction_dfs.append(df_test)
-        print("predictions done")
 
-    df_all_preds = pd.concat(prediction_dfs)
+        mlflow.log_metrics(metrics)
 
-    
-
-    
-
-    print("all done")
+        for _, v in plots.items():
+            mlflow.log_artifact(v)
+        print("all done")
 
     # model_a.fit(df, train_index, target_name)
     # df_test
