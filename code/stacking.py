@@ -1,6 +1,3 @@
-from nis import cat
-
-import catboost
 from catboost_model import catboost_model
 
 import pandas as pd
@@ -32,6 +29,10 @@ if __name__ == "__main__":
         print("predictions done")
 
     df_all_preds = pd.concat(prediction_dfs)
+
+    
+
+    
 
     print("all done")
 

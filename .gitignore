@@ -1,0 +1,7 @@
+catboost_info
+*__pycache__
+data/
+mlruns/
+notebooks/catboost_info/
+plots/*
+test_sample.csv
