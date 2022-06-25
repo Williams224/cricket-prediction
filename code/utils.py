@@ -123,35 +123,35 @@ def evaluate_reg(
 
     residuals = preds - y_test
 
+    metrics[f"residuals_mean_{model_name}"] = np.mean(residuals)
+    metrics[f"residuals_median_{model_name}"] = np.median(residuals)
+
     resid_fig = plot_residuals(residuals)
-    resid_fp = f"/tmp/residuals_hist.png"
+    resid_fp = f"/tmp/residuals_hist_{model_name}.png"
     resid_fig.savefig(resid_fp)
 
-    plots["residuals"] = resid_fp
+    plots[f"residuals_{model_name}"] = resid_fp
 
     rmse = np.sqrt(mean_squared_error(y_test, preds))
-    metrics["rmse"] = rmse
+    metrics[f"rmse_{model_name}"] = rmse
 
     for kb in key_balls:
         rmse_kb = rmse_at_balls(data, kb, model_name, target_name)
-        metrics[f"rmse_at_{kb}"] = rmse_kb
+        metrics[f"rmse_at_{kb}_{model_name}"] = rmse_kb
         plots[f"{model_name}_scatter_at_{kb}_balls"] = scatter_at_balls(
             data, kb, f"{model_name}_scatter_at_{kb}_balls", model_name, target_name
         )
 
+    rmse_x = []
+    rmse_y = []
+    for i in range(12, 270):
+        rmse_x.append(i)
+        rmse_y.append(rmse_at_balls(data, i, model_name, target_name))
+
+    rmse_plot = plot_rmses(rmse_x, rmse_y)
+    rmse_plot_fp = f"/tmp/rmse_plot_{model_name}.png"
+    rmse_plot.savefig(rmse_plot_fp)
+
+    plots[f"rmse_plot_{model_name}"] = rmse_plot_fp
+
     return plots, metrics
-
-
-#  rmse_x = []
-##   rmse_y = []
-#   for i in range(12, 270):
-#     rmse_x.append(i)
-#     rmse_y.append(rmse_at_balls(X_test, i))
-#
-#  rmse_plot = plot_rmses(rmse_x, rmse_y)
-#   rmse_plot_fp = f"{plots_path}/rmse_plot.png"
-#  rmse_plot.savefig(rmse_plot_fp)
-
-#  plots["rmse_plot"] = rmse_plot_fp
-
-#  return plots, metrics
