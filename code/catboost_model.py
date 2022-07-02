@@ -47,15 +47,17 @@ features = [
     Feature("overall_ball_n", False),
     Feature("batter_current_runs", False),
     Feature("mean_encoded_batting_team", False),
+    # Feature("ten_wicket_prediction", False),
+    # Feature("lose_all_wickets", True),
     # Feature("batting_team", True),
-    Feature("batter_won_toss", True),
+    # Feature("batter_won_toss", True),
 ]
 
 catboost_model = CatboostModel(
     "catboost",
     features,
     {
-        "learning_rate": 0.1,
+        "learning_rate": 0.2,
         "iterations": 3000,
         "eval_metric": "RMSE",
         "l2_leaf_reg": 2,

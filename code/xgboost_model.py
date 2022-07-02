@@ -62,8 +62,10 @@ features = [
     Feature("overall_ball_n", False),
     Feature("batter_current_runs", False),
     Feature("mean_encoded_batting_team", False),
+    Feature("ten_wicket_prediction", False),
+    # Feature("lose_all_wickets", True),
     # Feature("batting_team", True),
-    Feature("batter_won_toss", True),
+    # Feature("batter_won_toss", True),
 ]
 
 
@@ -73,7 +75,7 @@ xgboost_model = XGBoostModel(
     {
         "objective": "reg:squarederror",
         "colsample_bytree": 0.3,
-        "learning_rate": 0.1,
+        "learning_rate": 0.2,
         "n_estimators": 3000,
         "max_depth": 4,
         "early_stopping_rounds": 50,

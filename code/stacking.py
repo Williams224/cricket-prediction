@@ -1,7 +1,8 @@
 from sklearn import metrics
 from catboost_model import catboost_model
 from xgboost_model import xgboost_model
-from sklearn.linear_model import LinearRegression
+from adaboost_model import adaboost_model
+from sklearn.linear_model import Lasso
 import mlflow
 import utils
 import pandas as pd
@@ -32,6 +33,14 @@ if __name__ == "__main__":
     df["mean_encoded_batting_team"] = df.groupby("batting_team")[
         "first_innings_total_runs"
     ].transform("mean")
+
+    df["wicket_rate"] = df["current_wickets"] / df["overall_ball_n"]
+
+    df.loc[df["wicket_rate"] == 0, "wicket_rate"] = 0.033
+
+    df["ten_wicket_prediction"] = 10.0 / df["wicket_rate"]
+
+    df["lose_all_wickets"] = df["ten_wicket_prediction"] < 300.0
 
     target_name = "first_innings_total_runs"
 
@@ -80,6 +89,20 @@ if __name__ == "__main__":
                 mlflow.log_artifact(xgboost_fi_plot_path)
                 mlflow.log_artifact(xgboost_fi_json_path)
 
+                # =================================== adaboost =============================================
+                adaboost_model.fit(df, train_index, target_name, {})
+                print("adaboost fit done")
+                adaboost_predictions = adaboost_model.predict(df_test)
+                df_test[f"{adaboost_model.name}_predictions"] = adaboost_predictions
+                print("adaboost predictios done")
+
+                (
+                    adaboost_fi_plot_path,
+                    adaboost_fi_json_path,
+                ) = utils.get_feature_importances(adaboost_model, df_test, target_name)
+                mlflow.log_artifact(adaboost_fi_plot_path)
+                mlflow.log_artifact(adaboost_fi_json_path)
+
                 prediction_dfs.append(df_test)
 
             df_all_preds = pd.concat(prediction_dfs)
@@ -94,6 +117,13 @@ if __name__ == "__main__":
 
             metrics = {**catboost_metrics, **xgboost_metrics}
             plots = {**catboost_plots, **xgboost_plots}
+
+            adaboost_plots, adaboost_metrics = utils.evaluate_reg(
+                df_all_preds, adaboost_model.name, target_name
+            )
+
+            metrics.update(adaboost_metrics)
+            plots.update(adaboost_plots)
 
             mlflow.log_metrics(metrics)
 
@@ -114,6 +144,7 @@ if __name__ == "__main__":
         meta_features = [
             "xgboost_predictions",
             "catboost_predictions",
+            "adaboost_predictions",
         ]
         meta_gkf = GroupKFold(2)
 
@@ -130,7 +161,7 @@ if __name__ == "__main__":
             y_train = df_train[[target_name]]
             y_test = df_test[[target_name]]
 
-            reg = LinearRegression().fit(X_train, y_train)
+            reg = Lasso().fit(X_train, y_train)
 
             score = reg.score(X_train, y_train)
             mlflow.log_metric(f"score_{index}", score)
