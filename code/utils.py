@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 import pandas as pd
+from sklearn.inspection import permutation_importance
+import uuid
+import json
 
 
 def determine_bowl_team(row):
@@ -155,3 +158,42 @@ def evaluate_reg(
     plots[f"rmse_plot_{model_name}"] = rmse_plot_fp
 
     return plots, metrics
+
+
+def get_feature_importances(model, df_test, target_name):
+    perm = permutation_importance(
+        model,
+        df_test[model.all_features],
+        df_test[target_name],
+        scoring="neg_root_mean_squared_error",
+        n_jobs=-1,
+    )
+
+    perm_sorted_idx = perm.importances_mean.argsort()
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.cla()
+    y_indices = np.arange(0, len(perm.importances_mean)) + 0.5
+    ax.barh(
+        y_indices,
+        perm.importances_mean[perm_sorted_idx],
+        xerr=perm.importances_std[perm_sorted_idx],
+    )
+    ax.set_yticks(y_indices)
+    ax.set_yticklabels(np.array(model.all_features)[perm_sorted_idx])
+    ax.set_xlabel("diff root_mean_squared_error")
+    fig.tight_layout()
+    uuid_fi = str(uuid.uuid4())
+    fi_plot_fp = f"/tmp/fi_plot_{model.name}_{uuid_fi}.png"
+    fig.savefig(fi_plot_fp)
+    fi_dict = {}
+    for feature_name, importance_mean, importance_std in zip(
+        model.all_features, perm.importances_mean, perm.importances_std
+    ):
+        fi_dict[feature_name] = [importance_mean, importance_std]
+
+    fi_json_file = f"/tmp/fi_json_{model.name}_{uuid_fi}.png"
+    with open(fi_json_file, "w") as f:
+        json.dump(fi_dict, f)
+
+    return fi_plot_fp, fi_json_file

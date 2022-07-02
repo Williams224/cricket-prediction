@@ -15,16 +15,34 @@ if __name__ == "__main__":
 
     df = df[~df.city.isna()]
 
+    df = df[df.overall_ball_n > 0]
+
+    df = df[
+        ~((df.total_balls_bowled < 300) & (df.total_wickets_lost < 10))
+    ]  # remove rain delays
+
+    df = df[df.batting_team_balls_faced > 3000]
+
+    df["current_run_rate"] = df["current_runs"] / df["overall_ball_n"]
+
+    df["naive_projection"] = (
+        df["current_run_rate"] * df["innings_balls_left"] + df["current_runs"]
+    )
+
+    df["mean_encoded_batting_team"] = df.groupby("batting_team")[
+        "first_innings_total_runs"
+    ].transform("mean")
+
     target_name = "first_innings_total_runs"
 
-    gkf = GroupKFold(5)
+    gkf = GroupKFold(2)
 
     prediction_dfs = []
 
     mlflow.set_experiment("stacked")
     with mlflow.start_run():
 
-        if False:
+        if True:
             for train_index, test_index in gkf.split(df, groups=df["match_id"]):
                 df_test = df.iloc[test_index]
                 # =================================== catboost =============================================
@@ -39,12 +57,29 @@ if __name__ == "__main__":
                 catboost_predictions = catboost_model.predict(df_test)
                 df_test[f"{catboost_model.name}_predictions"] = catboost_predictions
                 print(" catboost predictions done")
+
+                (
+                    catboost_fi_plot_path,
+                    catboost_fi_json_path,
+                ) = utils.get_feature_importances(catboost_model, df_test, target_name)
+                mlflow.log_artifact(catboost_fi_plot_path)
+                mlflow.log_artifact(catboost_fi_json_path)
+
+                print("catboost feature importance done")
                 # =================================== xgboost =============================================
                 xgboost_model.fit(df, train_index, test_index, target_name, {})
                 print("xgboost fit done")
                 xgboost_predictions = xgboost_model.predict(df_test)
                 df_test[f"{xgboost_model.name}_predictions"] = xgboost_predictions
                 print("xgboost predictions done")
+
+                (
+                    xgboost_fi_plot_path,
+                    xgboost_fi_json_path,
+                ) = utils.get_feature_importances(xgboost_model, df_test, target_name)
+                mlflow.log_artifact(xgboost_fi_plot_path)
+                mlflow.log_artifact(xgboost_fi_json_path)
+
                 prediction_dfs.append(df_test)
 
             df_all_preds = pd.concat(prediction_dfs)
@@ -76,36 +111,41 @@ if __name__ == "__main__":
 
         # ==================================== meta regressor ================================================
 
-        
+        meta_features = [
+            "xgboost_predictions",
+            "catboost_predictions",
+        ]
         meta_gkf = GroupKFold(2)
 
         meta_preds = []
+        index = 0
         for train_index, test_index in meta_gkf.split(
             df_all_preds, groups=df_all_preds[["match_id"]]
         ):
             df_test = df_all_preds.iloc[test_index]
             df_train = df_all_preds.iloc[train_index]
 
-            X_train = df_train[["xgboost_predictions", "catboost_predictions"]]
-            X_test = df_test[["xgboost_predictions", "catboost_predictions"]]
+            X_train = df_train[meta_features]
+            X_test = df_test[meta_features]
             y_train = df_train[[target_name]]
             y_test = df_test[[target_name]]
 
             reg = LinearRegression().fit(X_train, y_train)
 
             score = reg.score(X_train, y_train)
-            print("score")
+            mlflow.log_metric(f"score_{index}", score)
+            predictions = reg.predict(X_test)
             print(reg.coef_)
             print(reg.intercept_)
-            predictions = reg.predict(X_test)
 
-            df_test["linear_predictions"] = predictions
+            df_test["meta_predictions"] = predictions
             meta_preds.append(df_test)
+            index += 1
 
         df_meta_preds = pd.concat(meta_preds, axis=0)
 
         meta_plots, meta_metrics = utils.evaluate_reg(
-            df_meta_preds, "linear", target_name
+            df_meta_preds, "meta", target_name
         )
 
         mlflow.log_metrics(meta_metrics)

@@ -57,12 +57,15 @@ Feature = namedtuple("feature", "name categorical")
 
 features = [
     Feature("current_runs", False),
+    Feature("naive_projection", False),
     Feature("current_wickets", False),
     Feature("overall_ball_n", False),
     Feature("batter_current_runs", False),
-    Feature("batting_team", True),
+    Feature("mean_encoded_batting_team", False),
+    # Feature("batting_team", True),
     Feature("batter_won_toss", True),
 ]
+
 
 xgboost_model = XGBoostModel(
     "xgboost",
