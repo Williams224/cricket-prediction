@@ -48,6 +48,7 @@ if __name__ == "__main__":
 
     prediction_dfs = []
 
+    df = df.reset_index(drop=True)
     mlflow.set_experiment("stacked")
     with mlflow.start_run():
 
@@ -55,41 +56,48 @@ if __name__ == "__main__":
             for train_index, test_index in gkf.split(df, groups=df["match_id"]):
                 df_test = df.iloc[test_index]
                 # =================================== catboost =============================================
-                catboost_model.fit(
-                    df,
-                    train_index,
-                    test_index,
-                    target_name,
-                    {"early_stopping_rounds": 50},
-                )
-                print(" catboost fit done")
-                catboost_predictions = catboost_model.predict(df_test)
-                df_test[f"{catboost_model.name}_predictions"] = catboost_predictions
-                print(" catboost predictions done")
+                if True:
+                    catboost_model.fit(
+                        df,
+                        train_index,
+                        test_index,
+                        target_name,
+                        {"early_stopping_rounds": 50},
+                    )
+                    print(" catboost fit done")
+                    catboost_predictions = catboost_model.predict(df_test)
+                    df_test[f"{catboost_model.name}_predictions"] = catboost_predictions
+                    print(" catboost predictions done")
 
-                (
-                    catboost_fi_plot_path,
-                    catboost_fi_json_path,
-                ) = utils.get_feature_importances(catboost_model, df_test, target_name)
-                mlflow.log_artifact(catboost_fi_plot_path)
-                mlflow.log_artifact(catboost_fi_json_path)
+                    (
+                        catboost_fi_plot_path,
+                        catboost_fi_json_path,
+                    ) = utils.get_feature_importances(
+                        catboost_model, df_test, target_name
+                    )
+                    mlflow.log_artifact(catboost_fi_plot_path)
+                    mlflow.log_artifact(catboost_fi_json_path)
 
-                print("catboost feature importance done")
-                # =================================== xgboost =============================================
-                xgboost_model.fit(df, train_index, test_index, target_name, {})
-                print("xgboost fit done")
-                xgboost_predictions = xgboost_model.predict(df_test)
-                df_test[f"{xgboost_model.name}_predictions"] = xgboost_predictions
-                print("xgboost predictions done")
+                    print("catboost feature importance done")
+                    # =================================== xgboost =============================================
+                if True:
+                    xgboost_model.fit(df, train_index, test_index, target_name, {})
+                    print("xgboost fit done")
+                    xgboost_predictions = xgboost_model.predict(df_test)
+                    df_test[f"{xgboost_model.name}_predictions"] = xgboost_predictions
+                    print("xgboost predictions done")
 
-                (
-                    xgboost_fi_plot_path,
-                    xgboost_fi_json_path,
-                ) = utils.get_feature_importances(xgboost_model, df_test, target_name)
-                mlflow.log_artifact(xgboost_fi_plot_path)
-                mlflow.log_artifact(xgboost_fi_json_path)
-
+                    (
+                        xgboost_fi_plot_path,
+                        xgboost_fi_json_path,
+                    ) = utils.get_feature_importances(
+                        xgboost_model, df_test, target_name
+                    )
+                    mlflow.log_artifact(xgboost_fi_plot_path)
+                    mlflow.log_artifact(xgboost_fi_json_path)
+                    print("xgboost fi done")
                 # =================================== adaboost =============================================
+                print("adaboost fit starting")
                 adaboost_model.fit(df, train_index, target_name, {})
                 print("adaboost fit done")
                 adaboost_predictions = adaboost_model.predict(df_test)

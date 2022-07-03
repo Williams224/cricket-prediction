@@ -51,7 +51,8 @@ class AdaBoostModel(BaseModel):
                 transformed_cat_data, columns=self.ohc.get_feature_names_out()
             )
             preprocessed_data = pd.concat(
-                [test_data.reset_index(), ohe_df.reset_index()], axis=1
+                [test_data.reset_index(drop=True), ohe_df.reset_index(drop=True)],
+                axis=1,
             )
             X_test = preprocessed_data[self.preprocessed_feature_columns]
         else:
